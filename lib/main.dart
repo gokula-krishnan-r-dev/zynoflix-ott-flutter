@@ -12,7 +12,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 // App configuration for easy customization
 class AppConfig {
   static const String appName = 'ShortFilm OTT';
-  static const String logoPath = 'assets/images/play_store_512.png';
+  static const String logoPath = 'assets/images/newlogo.png';
+  static const String newLogoPath = 'assets/images/newlogo.png';
   static const String webUrl = 'https://zynoflixott.com';
   static const Duration splashDuration = Duration(seconds: 3);
   
@@ -59,7 +60,7 @@ class ZynoFlixLogo extends StatelessWidget {
                 ),
               ],
             ),
-            child: Image.asset(AppConfig.logoPath, width: 300, height: 300),
+            child: Image.asset(AppConfig.logoPath, width: 400, height: 400),
           ),
         
         // Logo text
@@ -133,7 +134,7 @@ class ZynoFlixLogo extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: Image.asset(AppConfig.logoPath),
+                child: Image.asset(AppConfig.newLogoPath),
               ),
             ],
           ),
@@ -750,7 +751,7 @@ class _WebViewPageState extends State<WebViewPage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Image.asset(AppConfig.logoPath, width: 100, height: 100),
+                    Image.asset(AppConfig.newLogoPath),
                     const SizedBox(height: 40),
                     Text(
                       'ShortFilm OTT',
@@ -787,7 +788,7 @@ class _WebViewPageState extends State<WebViewPage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       // Show logo while loading
-                     Image.asset(AppConfig.logoPath, width: 100, height: 100),
+                     Image.asset(AppConfig.newLogoPath, width: 100, height: 100),
                       const SizedBox(height: 40),
                       CircularProgressIndicator(
                         value: loadingProgress > 0 ? loadingProgress : null,
@@ -814,7 +815,7 @@ class _WebViewPageState extends State<WebViewPage> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       // Also show logo in error screen
-                      Image.asset(AppConfig.logoPath, width: 100, height: 100),
+                      Image.asset(AppConfig.newLogoPath, width: 100, height: 100),
                       const SizedBox(height: 32),
                       Icon(
                         Icons.error_outline,
