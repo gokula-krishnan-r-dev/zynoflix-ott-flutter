@@ -5,10 +5,8 @@ import 'package:flutter/services.dart';
 import 'dart:ui' as ui;
 import 'dart:io' show Platform, File;
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:app_settings/app_settings.dart';
-import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:math';
 
 // App configuration for easy customization
@@ -523,25 +521,22 @@ class _WebViewPageState extends State<WebViewPage> {
   // Comprehensive permission handling for both Android and iOS
   Future<void> _checkAndRequestPermissions() async {
     if (Platform.isAndroid) {
-      // Android permissions
+      // Android permissions - only request the essential ones
       Map<Permission, PermissionStatus> statuses =
           await [
-            Permission.storage,
             Permission.photos,
             Permission.camera,
-            // Add media permissions for Android 13+
-            if (await _isAndroid13OrHigher()) ...[
-              Permission.mediaLibrary,
-              Permission.videos,
-              Permission.audio,
-            ],
+            Permission.videos,
           ].request();
 
       bool allGranted = true;
       String deniedPermissions = '';
 
-      statuses.forEach((permission, status) {
-        if (status != PermissionStatus.granted) {
+      // Only check the permissions we care about
+      [Permission.photos, Permission.camera, Permission.videos].forEach((
+        permission,
+      ) {
+        if (statuses[permission] != PermissionStatus.granted) {
           allGranted = false;
           deniedPermissions += '${permission.toString()}, ';
         }
@@ -549,16 +544,13 @@ class _WebViewPageState extends State<WebViewPage> {
 
       if (!allGranted) {
         debugPrint('Some permissions were denied: $deniedPermissions');
-        // Show dialog only if storage or photos permission is denied
-        if (statuses[Permission.storage] != PermissionStatus.granted ||
-            statuses[Permission.photos] != PermissionStatus.granted) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _showPermissionsDialog();
-          });
-        }
+        // Show dialog only if specified permissions are denied
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showPermissionsDialog();
+        });
       }
     } else if (Platform.isIOS) {
-      // iOS permissions
+      // iOS permissions - only request the essential ones
       Map<Permission, PermissionStatus> statuses =
           await [
             Permission.photos,
@@ -569,8 +561,9 @@ class _WebViewPageState extends State<WebViewPage> {
       bool allGranted = true;
       String deniedPermissions = '';
 
-      statuses.forEach((permission, status) {
-        if (status != PermissionStatus.granted) {
+      // Only check the permissions we care about
+      [Permission.photos, Permission.camera].forEach((permission) {
+        if (statuses[permission] != PermissionStatus.granted) {
           allGranted = false;
           deniedPermissions += '${permission.toString()}, ';
         }
@@ -578,25 +571,11 @@ class _WebViewPageState extends State<WebViewPage> {
 
       if (!allGranted) {
         debugPrint('Some iOS permissions were denied: $deniedPermissions');
-
-        // For iOS, we particularly care about photos permission
-        if (statuses[Permission.photos] != PermissionStatus.granted) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _showPermissionsDialog();
-          });
-        }
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showPermissionsDialog();
+        });
       }
     }
-  }
-
-  // Helper to check Android version
-  Future<bool> _isAndroid13OrHigher() async {
-    if (Platform.isAndroid) {
-      final DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
-      final androidInfo = await deviceInfo.androidInfo;
-      return androidInfo.version.sdkInt >= 33; // API level 33 is Android 13
-    }
-    return false;
   }
 
   // Dialog to explain permissions and guide the user
@@ -613,14 +592,14 @@ class _WebViewPageState extends State<WebViewPage> {
             child: ListBody(
               children: <Widget>[
                 const Text(
-                  'This app needs access to your files to upload content to the website. Without these permissions, you won\'t be able to upload files.',
+                  'This app needs access to your storage and camera to upload content to the website. Without these permissions, you won\'t be able to upload files or images.',
                   style: TextStyle(fontSize: 16),
                 ),
                 const SizedBox(height: 16),
                 Text(
                   Platform.isAndroid
-                      ? 'Please grant Storage and Photos permissions in the app settings.'
-                      : 'Please grant Photos access in the app settings.',
+                      ? 'Please grant Storage, Photos, Camera, and Videos permissions in the app settings.'
+                      : 'Please grant Photos and Camera access in the app settings.',
                   style: const TextStyle(fontSize: 16),
                 ),
               ],
