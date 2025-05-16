@@ -295,6 +295,8 @@ void main() async {
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
   ]);
 
   // Set system UI overlay style
@@ -522,21 +524,20 @@ class _WebViewPageState extends State<WebViewPage> {
   Future<void> _checkAndRequestPermissions() async {
     if (Platform.isAndroid) {
       // Android permissions - only request the essential ones
-      Map<Permission, PermissionStatus> statuses =
-          await [
-            Permission.photos,
-            Permission.camera,
-            Permission.videos,
-          ].request();
+      await [Permission.photos, Permission.camera, Permission.videos].request();
+
+      // Log the permission status but don't show dialog
+      Map<Permission, PermissionStatus> statuses = {
+        Permission.photos: await Permission.photos.status,
+        Permission.camera: await Permission.camera.status,
+        Permission.videos: await Permission.videos.status,
+      };
 
       bool allGranted = true;
       String deniedPermissions = '';
 
-      // Only check the permissions we care about
-      [Permission.photos, Permission.camera, Permission.videos].forEach((
-        permission,
-      ) {
-        if (statuses[permission] != PermissionStatus.granted) {
+      statuses.forEach((permission, status) {
+        if (status != PermissionStatus.granted) {
           allGranted = false;
           deniedPermissions += '${permission.toString()}, ';
         }
@@ -544,26 +545,27 @@ class _WebViewPageState extends State<WebViewPage> {
 
       if (!allGranted) {
         debugPrint('Some permissions were denied: $deniedPermissions');
-        // Show dialog only if specified permissions are denied
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _showPermissionsDialog();
-        });
       }
     } else if (Platform.isIOS) {
       // iOS permissions - only request the essential ones
-      Map<Permission, PermissionStatus> statuses =
-          await [
-            Permission.photos,
-            Permission.camera,
-            Permission.mediaLibrary,
-          ].request();
+      await [
+        Permission.photos,
+        Permission.camera,
+        Permission.mediaLibrary,
+      ].request();
+
+      // Log the permission status but don't show dialog
+      Map<Permission, PermissionStatus> statuses = {
+        Permission.photos: await Permission.photos.status,
+        Permission.camera: await Permission.camera.status,
+        Permission.mediaLibrary: await Permission.mediaLibrary.status,
+      };
 
       bool allGranted = true;
       String deniedPermissions = '';
 
-      // Only check the permissions we care about
-      [Permission.photos, Permission.camera].forEach((permission) {
-        if (statuses[permission] != PermissionStatus.granted) {
+      statuses.forEach((permission, status) {
+        if (status != PermissionStatus.granted) {
           allGranted = false;
           deniedPermissions += '${permission.toString()}, ';
         }
@@ -571,63 +573,8 @@ class _WebViewPageState extends State<WebViewPage> {
 
       if (!allGranted) {
         debugPrint('Some iOS permissions were denied: $deniedPermissions');
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _showPermissionsDialog();
-        });
       }
     }
-  }
-
-  // Dialog to explain permissions and guide the user
-  Future<void> _showPermissionsDialog() async {
-    if (!mounted) return;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Permissions Required'),
-          content: SingleChildScrollView(
-            child: ListBody(
-              children: <Widget>[
-                const Text(
-                  'This app needs access to your storage and camera to upload content to the website. Without these permissions, you won\'t be able to upload files or images.',
-                  style: TextStyle(fontSize: 16),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  Platform.isAndroid
-                      ? 'Please grant Storage, Photos, Camera, and Videos permissions in the app settings.'
-                      : 'Please grant Photos and Camera access in the app settings.',
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ],
-            ),
-          ),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('Later'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-            ElevatedButton(
-              child: const Text('Open Settings'),
-              onPressed: () {
-                Navigator.of(context).pop();
-                AppSettings.openAppSettings();
-              },
-            ),
-          ],
-          backgroundColor: AppConfig.backgroundColor,
-          elevation: 24,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        );
-      },
-    );
   }
 
   @override
@@ -662,6 +609,17 @@ class _WebViewPageState extends State<WebViewPage> {
                       useShouldOverrideUrlLoading: true,
                       allowFileAccessFromFileURLs: true,
                       allowUniversalAccessFromFileURLs: true,
+                      useHybridComposition: true,
+                      useOnLoadResource: true,
+                      supportMultipleWindows: true,
+                      verticalScrollBarEnabled: true,
+                      horizontalScrollBarEnabled: true,
+                      preferredContentMode:
+                          UserPreferredContentMode.RECOMMENDED,
+                      applicationNameForUserAgent: "ShortFilm-OTT-App",
+                      allowsInlineMediaPlayback: true,
+                      useShouldInterceptRequest: true,
+                      useShouldInterceptAjaxRequest: true,
                     ),
                     onWebViewCreated: (controller) {
                       _webViewController = controller;
@@ -719,6 +677,39 @@ class _WebViewPageState extends State<WebViewPage> {
                     },
                     onConsoleMessage: (controller, consoleMessage) {
                       debugPrint('Console: ${consoleMessage.message}');
+
+                      // Check if a video is playing
+                      if (consoleMessage.message.contains('Video is playing')) {
+                        // You can add video-specific handling here
+                        debugPrint('Video playback detected');
+                      }
+                    },
+                    onLoadResource: (controller, resource) {
+                      // Check if the loaded resource is a video file
+                      if (resource.url.toString().contains('.mp4') ||
+                          resource.url.toString().contains('.m3u8') ||
+                          resource.url.toString().contains('.webm')) {
+                        debugPrint('Video resource detected: ${resource.url}');
+                      }
+                    },
+                    // Handle entering and exiting fullscreen mode
+                    onEnterFullscreen: (controller) {
+                      debugPrint('Entering fullscreen mode');
+                      // Force landscape orientation when entering fullscreen
+                      SystemChrome.setPreferredOrientations([
+                        DeviceOrientation.landscapeLeft,
+                        DeviceOrientation.landscapeRight,
+                      ]);
+                    },
+                    onExitFullscreen: (controller) {
+                      debugPrint('Exiting fullscreen mode');
+                      // Allow all orientations when exiting fullscreen
+                      SystemChrome.setPreferredOrientations([
+                        DeviceOrientation.portraitUp,
+                        DeviceOrientation.portraitDown,
+                        DeviceOrientation.landscapeLeft,
+                        DeviceOrientation.landscapeRight,
+                      ]);
                     },
                   ),
                 ),
@@ -855,149 +846,63 @@ class _WebViewPageState extends State<WebViewPage> {
         
         console.log("Form data logger injected");
         
-        // Improve console logging for objects
-        const originalConsoleLog = console.log;
-        console.log = function() {
-          if (arguments.length > 0 && typeof arguments[0] === 'object') {
-            try {
-              // Try to stringify the object for better logging
-              const stringified = JSON.stringify(arguments[0], null, 2);
-              originalConsoleLog.apply(console, ["Object logged:", stringified]);
-            } catch (e) {
-              originalConsoleLog.apply(console, arguments);
-            }
-          } else {
-            originalConsoleLog.apply(console, arguments);
-          }
-        };
-        
-        // Monitor form submissions
-        document.addEventListener('submit', function(event) {
-          console.log("Form submission detected", {
-            formAction: event.target.action,
-            formMethod: event.target.method,
-            formId: event.target.id,
-            formName: event.target.name
-          });
-          
-          // Log FormData contents if it's a multipart form
-          if (event.target.enctype === 'multipart/form-data') {
-            try {
-              const formData = new FormData(event.target);
-              console.log("Form has multipart data");
+        // Make videos fullscreen-friendly
+        function setupVideoFullscreenSupport() {
+          // Find all video elements on the page
+          const videos = document.querySelectorAll('video');
+          videos.forEach(video => {
+            if (!video.hasAttribute('data-fullscreen-enabled')) {
+              // Mark this video as enhanced
+              video.setAttribute('data-fullscreen-enabled', 'true');
               
-              // Log each entry in the FormData
-              const entries = Array.from(formData.entries());
-              entries.forEach(entry => {
-                const [key, value] = entry;
-                if (value instanceof File) {
-                  console.log("File field:", key, {
-                    fileName: value.name,
-                    fileType: value.type,
-                    fileSize: value.size
-                  });
-                } else {
-                  console.log("Form field:", key, value);
+              // Add fullscreen capability
+              video.setAttribute('playsinline', 'true');
+              video.setAttribute('webkit-playsinline', 'true');
+              video.setAttribute('controls', 'true');
+              
+              // Make sure clicking the video works for fullscreen
+              video.addEventListener('click', function() {
+                if (this.paused) {
+                  this.play();
                 }
               });
-            } catch (e) {
-              console.log("Error inspecting form data:", e.toString());
-            }
-          }
-        });
-        
-        // Enhanced file input handling 
-        document.addEventListener('change', function(event) {
-          if (event.target.type === 'file') {
-            console.log("File input changed:", {
-              inputId: event.target.id,
-              inputName: event.target.name,
-              filesSelected: event.target.files ? event.target.files.length : 0
-            });
-            
-            // Ensure file is properly attached
-            if (event.target.files && event.target.files.length > 0) {
-              for (let i = 0; i < event.target.files.length; i++) {
-                const file = event.target.files[i];
-                console.log("Selected file " + (i+1) + ":", {
-                  name: file.name,
-                  type: file.type,
-                  size: file.size + " bytes"
-                });
-              }
               
-              // Trigger form field validation if needed
-              try {
-                const form = event.target.form;
-                if (form) {
-                  // Dispatch events that frameworks use to detect changes
-                  ['change', 'input'].forEach(eventType => {
-                    const changeEvent = new Event(eventType, { bubbles: true });
-                    event.target.dispatchEvent(changeEvent);
-                  });
-                  
-                  console.log("Additional change events dispatched for file input");
-                  
-                  // Find any related preview elements
-                  const filePreviewElements = document.querySelectorAll('[data-preview-for="' + event.target.id + '"]');
-                  if (filePreviewElements.length > 0) {
-                    console.log("Found " + filePreviewElements.length + " preview elements for this file input");
+              // Add double tap for fullscreen
+              let lastTapTime = 0;
+              video.addEventListener('touchend', function(e) {
+                const currentTime = new Date().getTime();
+                const tapLength = currentTime - lastTapTime;
+                if (tapLength < 300 && tapLength > 0) {
+                  // Double tap detected
+                  e.preventDefault();
+                  if (document.fullscreenElement) {
+                    document.exitFullscreen();
+                  } else {
+                    if (this.requestFullscreen) {
+                      this.requestFullscreen();
+                    } else if (this.webkitRequestFullscreen) {
+                      this.webkitRequestFullscreen();
+                    } else if (this.mozRequestFullScreen) {
+                      this.mozRequestFullScreen();
+                    } else if (this.msRequestFullscreen) {
+                      this.msRequestFullscreen();
+                    }
                   }
                 }
-              } catch (e) {
-                console.log("Error in file input enhancement:", e.toString());
-              }
-            }
-          }
-        });
-        
-        // Add special handling for forms that might have issues
-        const enhanceFormSubmissions = function() {
-          const forms = document.querySelectorAll('form');
-          console.log("Found " + forms.length + " forms to enhance");
-          
-          forms.forEach((form, index) => {
-            // Skip if already enhanced
-            if (form.hasAttribute('data-enhanced')) return;
-            form.setAttribute('data-enhanced', 'true');
-            
-            console.log("Enhancing form #" + (index + 1), {
-              id: form.id,
-              name: form.name,
-              action: form.action,
-              method: form.method,
-              enctype: form.enctype
-            });
-            
-            // Find file inputs
-            const fileInputs = form.querySelectorAll('input[type="file"]');
-            if (fileInputs.length > 0) {
-              console.log("Form has " + fileInputs.length + " file input(s)");
-              
-              // Ensure form has proper enctype for file uploads
-              if (form.enctype !== 'multipart/form-data' && fileInputs.length > 0) {
-                console.log("Setting multipart/form-data enctype on form");
-                form.enctype = 'multipart/form-data';
-              }
-              
-              // Add IDs to any file inputs that don't have them
-              fileInputs.forEach((input, idx) => {
-                if (!input.id) {
-                  const newId = 'file_input_' + Date.now() + '_' + idx;
-                  input.id = newId;
-                  console.log("Added ID to file input:", newId);
-                }
+                lastTapTime = currentTime;
               });
+              
+              console.log("Enhanced video for fullscreen:", video.src);
             }
           });
-        };
+        }
         
-        // Run form enhancement immediately
-        enhanceFormSubmissions();
+        // Run immediately and on DOM changes
+        setupVideoFullscreenSupport();
         
-        // And also after any dynamic content changes using MutationObserver
+        // Monitor DOM for new video elements
         const observer = new MutationObserver(function(mutations) {
-          enhanceFormSubmissions();
+          setupVideoFullscreenSupport();
         });
         
         observer.observe(document.body, { 
@@ -1005,7 +910,7 @@ class _WebViewPageState extends State<WebViewPage> {
           subtree: true 
         });
         
-        console.log("Form enhancement complete");
+        console.log("Video fullscreen support initialized");
       })();
     ''',
     );
